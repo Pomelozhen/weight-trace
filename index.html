@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg-color: #F2F2F7; --card-bg: #FFFFFF; --text-main: #000000; --text-sec: #8E8E93;
+      --accent: #007AFF; --border: #E5E5EA; --input-bg: #F2F2F7; --radius: 20px;
+    }
+    .dark-mode {
+      --bg-color: #000000; --card-bg: #1C1C1E; --text-main: #FFFFFF; --text-sec: #8E8E93;
+      --accent: #0A84FF; --border: #38383A; --input-bg: #2C2C2E;
+    }
+      html, body {
+  margin: 20;
+  padding: 16;
+  overflow-x: hidden;
+}
+
+    body {
+      background: var(--bg-color); color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro TC", sans-serif;
+      margin: 0; padding: 20px 16px 100px; -webkit-tap-highlight-color: transparent; transition: background 0.3s;
+    }
+
+    /* 💎 動態且縮小的中央 HUD 提示 */
+    #hud-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.15); display: none; justify-content: center; align-items: center; z-index: 2000;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .hud-card {
+      background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+      padding: 16px 24px; border-radius: 16px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+      min-width: 100px;
+      transform: scale(0.8); transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .dark-mode .hud-card { background: rgba(44, 44, 46, 0.85); }
+    .hud-text { font-size: 14px; font-weight: 600; margin-top: 8px; display: block; }
+
+    #hud-overlay.show { opacity: 1; }
+    #hud-overlay.show .hud-card { transform: scale(1); }
+    @keyframes hud-spin { 100% { transform: rotate(360deg); } }
+    .hud-spinning { animation: hud-spin 1s linear infinite; display: inline-block; }
+
+    .header-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px; }
+    h1 { font-size: 28px; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
+    h2 { font-size: 16px; font-weight: 600; margin: 24px 0 12px 4px; color: var(--text-sec); letter-spacing: 1px;}
+
+    /* 1x4 儀表板與懸浮窗 */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .dash-box { background: var(--card-bg); padding: 12px 4px; border-radius: 16px; text-align: center; display: flex; flex-direction: column; justify-content: center; min-height: 80px; box-shadow: 0 2px 8px rgba(0,0,0,0.02); position: relative; cursor: pointer;}
+    .dash-title { font-size: 10px; color: var(--text-sec); font-weight: 600; margin-bottom: 6px; }
+    .dash-val { font-size: 18px; font-weight: 700; }
+    .status-badge { font-size: 11px; font-weight: 700; padding: 4px 6px; border-radius: 8px; margin: 0 auto; white-space: nowrap;}
+
+    .tooltip-box {
+      visibility: hidden; width: 220px; background-color: rgba(28,28,30,0.95); color: #FFF;
+      text-align: left; border-radius: 12px; padding: 12px; position: absolute; z-index: 100;
+      top: 105%; left: 50%; transform: translateX(-50%); box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      opacity: 0; transition: 0.2s; font-size: 12px; pointer-events: none;
+    }
+    .dash-box:hover .tooltip-box, .dash-box:active .tooltip-box { visibility: visible; opacity: 1; }
+    .t-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .t-row:last-child { border-bottom: none; padding-bottom: 0;}
+
+    /* 原本完美的輸入區排版 */
+    .card { background: var(--card-bg); border-radius: var(--radius); padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.03); margin-bottom: 16px; }
+    .input-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .input-row:last-child { margin-bottom: 0; }
+    .input-label { font-size: 15px; font-weight: 600; width: 36px; text-align: justify; text-align-last: justify; color: var(--text-sec); }
+    .input-unit { font-size: 15px; font-weight: 500; color: var(--text-sec); width: 24px; }
+    .input-field { flex: 1; background: var(--input-bg); border: none; border-radius: 12px; padding: 14px 16px; font-size: 16px; color: var(--text-main); outline: none; width: 100%; box-sizing: border-box;}
+
+    .btn-primary { width: 100%; background: var(--accent); color: white; border: none; border-radius: 14px; padding: 16px; font-size: 17px; font-weight: 600; cursor: pointer; margin-top: 16px;}
+
+    /* 原本完美的打卡清單 */
+    .habit-item { display: flex; align-items: center; padding: 14px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+    .habit-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .habit-item input { display: none; }
+    .checkmark { min-width: 24px; height: 24px; border: 2px solid var(--border); border-radius: 50%; margin-right: 12px; position: relative; transition: 0.2s; }
+    .habit-item input:checked + .checkmark { background: var(--accent); border-color: var(--accent); }
+    .habit-item input:checked + .checkmark::after { content: ""; position: absolute; left: 8px; top: 4px; width: 5px; height: 10px; border: solid white; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+    .habit-text { font-size: 16px; font-weight: 500; transition: 0.2s; }
+    .habit-item input:checked ~ .habit-text { color: var(--text-sec); text-decoration: line-through; }
+
+    /* 列表按鈕 */
+    .btn-small { background: var(--input-bg); color: var(--accent); border: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .btn-del { color: #FF3B30; background: rgba(255, 59, 48, 0.1); }
+
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 80px; background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); z-index: 100; padding-bottom: 10px; }
+    .dark-mode .tab-bar { background: rgba(28,28,30,0.85); }
+    .tab-item { text-align: center; color: var(--text-sec); cursor: pointer; font-size: 11px; font-weight: 500; width: 60px; }
+    .tab-item.active { color: var(--accent); }
+
+    .view-section { display: none; max-width: 500px; margin: 0 auto; animation: fade 0.3s ease; }
+    .active-view { display: block; }
+    @keyframes fade { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+    .icon-btn { background:none; border:none; font-size: 22px; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: 0.2s;}
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    .spinning { animation: spin 1s linear infinite; pointer-events: none; opacity: 0.6;}
+  </style>
+</head>
+<body>
+
+<div id="hud-overlay">
+  <div class="hud-card">
+    <div id="hud-icon" style="font-size: 28px; margin-bottom: 4px;">↻</div>
+    <span id="hud-text" class="hud-text">儲存中...</span>
+  </div>
+</div>
+
+<div id="view-home" class="view-section active-view">
+  <div class="header-bar">
+    <div>
+      <div style="font-size: 14px; color: var(--text-sec); margin-bottom: 4px; font-weight: 500;">你好，<span id="userNameDisp"></span> 👋</div>
+      <h1 id="homeTitle" style="margin: 0;">今日總覽</h1>
+    </div>
+    <div style="display: flex; gap: 4px; padding-bottom: 4px;">
+      <button id="refreshBtn" onclick="refreshData()" class="icon-btn">🔄</button>
+      <button onclick="toggleTheme()" class="icon-btn">🌓</button>
+    </div>
+  </div>
+
+  <div class="dashboard-grid">
+    <div class="dash-box">
+      <span class="dash-title">目前身高</span>
+      <span class="dash-val"><span id="dashH">--</span> <small style="font-size:10px; color:var(--text-sec);">cm</small></span>
+    </div>
+    <div class="dash-box">
+      <span class="dash-title">最新體重</span>
+      <span class="dash-val" style="color: var(--accent);"><span id="dashW">--</span> <small style="font-size:10px; color:var(--text-sec);">kg</small></span>
+    </div>
+    <div class="dash-box">
+      <span class="dash-title">BMI 指數 <span style="font-size:10px;">ⓘ</span></span>
+      <span class="dash-val" id="dashBMI">--</span>
+      <div class="tooltip-box" id="bmiPop1"></div>
+    </div>
+    <div class="dash-box">
+      <span class="dash-title">體態狀態 <span style="font-size:10px;">ⓘ</span></span>
+      <div id="dashStatus" class="status-badge" style="background: var(--input-bg); color: var(--text-sec);">未設定</div>
+      <div class="tooltip-box" id="bmiPop2"></div>
+    </div>
+  </div>
+
+  <h2>每日紀錄</h2>
+  <div class="card">
+    <div class="input-row">
+      <div class="input-label">日期</div>
+      <input type="date" id="inputDate" class="input-field" onchange="loadDateData()">
+      <div class="input-unit"></div>
+    </div>
+    <div class="input-row">
+      <div class="input-label">體重</div>
+      <input type="number" id="inputWeight" class="input-field" step="0.1" placeholder="0.0">
+      <div class="input-unit">kg</div>
+    </div>
+    <div class="input-row">
+      <div class="input-label">備註</div>
+      <input type="text" id="inputNote" class="input-field" placeholder="紀錄今天的狀況...">
+      <div class="input-unit"></div>
+    </div>
+    <button class="btn-primary" onclick="saveRecord(true)">儲存</button>
+  </div>
+
+  <h2>體重趨勢</h2>
+  <div class="card">
+    <div style="position: relative; height: 180px; width: 100%;"><canvas id="mainChart"></canvas></div>
+  </div>
+
+  <h2>昨日打卡</h2>
+  <div class="card" id="habitContainer">
+    </div>
+</div>
+
+<div id="view-data" class="view-section">
+  <div class="header-bar"><h1>完整資料</h1></div>
+  <div id="historyList">載入中...</div>
+</div>
+
+<div id="view-settings" class="view-section">
+  <div class="header-bar"><h1>設定</h1></div>
+  <div class="card">
+    <span style="font-size: 14px; color: var(--text-sec); margin-bottom: 12px; display: block;">基本資料</span>
+
+    <div class="input-row">
+      <div class="input-label">稱呼</div>
+      <input type="text" id="setName" class="input-field" placeholder="你的名字">
+      <div class="input-unit"></div>
+    </div>
+
+    <div class="input-row">
+      <div class="input-label">身高</div>
+      <input type="number" id="setHeight" class="input-field" placeholder="用於計算 BMI">
+      <div class="input-unit">cm</div>
+    </div>
+
+    <span style="font-size: 14px; color: var(--text-sec); margin: 24px 0 12px; display: block;">自訂打卡項目</span>
+    <input type="text" id="hName0" class="input-field" placeholder="習慣 1" style="margin-bottom: 8px;">
+    <input type="text" id="hName1" class="input-field" placeholder="習慣 2" style="margin-bottom: 8px;">
+    <input type="text" id="hName2" class="input-field" placeholder="習慣 3" style="margin-bottom: 8px;">
+    <input type="text" id="hName3" class="input-field" placeholder="習慣 4" style="margin-bottom: 8px;">
+    <input type="text" id="hName4" class="input-field" placeholder="習慣 5">
+
+    <button class="btn-primary" onclick="updateSettings()">儲存設定</button>
+  </div>
+</div>
+
+<nav class="tab-bar">
+  <div class="tab-item active" onclick="clickHomeTab(this)">
+    <div style="font-size: 22px; margin-bottom: 2px;">🏠</div>首頁
+  </div>
+  <div class="tab-item" onclick="switchView('data', this)">
+    <div style="font-size: 22px; margin-bottom: 2px;">🗂️</div>完整資料
+  </div>
+  <div class="tab-item" onclick="switchView('settings', this)">
+    <div style="font-size: 22px; margin-bottom: 2px;">⚙️</div>設定
+  </div>
+</nav>
+
+<script>
+  let appData = null;
+  let chartInstance = null;
+  let autoSaveTimer = null;
+
+  const bmiInfo = `
+    <div class="t-row"><span style="color:#FF9500; font-weight:600;">體重過輕</span><span>BMI < 18.5</span></div>
+    <div class="t-row"><span style="color:#34C759; font-weight:600;">健康體重</span><span>18.5 ≤ BMI < 24</span></div>
+    <div class="t-row"><span style="color:#FF3B30; font-weight:600;">體重過重</span><span>24 ≤ BMI < 27</span></div>
+    <div class="t-row"><span style="color:#FF3B30; font-weight:600;">輕度肥胖</span><span>27 ≤ BMI < 30</span></div>
+    <div class="t-row"><span style="color:#D00000; font-weight:600;">中度肥胖</span><span>30 ≤ BMI < 35</span></div>
+    <div class="t-row"><span style="color:#900000; font-weight:600;">重度肥胖</span><span>BMI ≥ 35</span></div>
+  `;
+
+
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwywZSc0ja_uFZoLU00ZeylssJyrFkb3ZMSBSPIJH4HpJNKj610fRnaCdLqaPQ_K8U6/exec';
+  let jsonpCounter = 0;
+
+  function apiCall(action, params = {}) {
+    return new Promise((resolve, reject) => {
+      const callbackName = `__gas_jsonp_${Date.now()}_${jsonpCounter++}`;
+      const query = new URLSearchParams({
+        action,
+        callback: callbackName,
+        ...Object.fromEntries(Object.entries(params).map(([k, v]) => [k, typeof v === 'string' ? v : JSON.stringify(v)]))
+      });
+
+      const script = document.createElement('script');
+      const timeout = setTimeout(() => {
+        cleanup();
+        reject(new Error('API timeout'));
+      }, 15000);
+
+      function cleanup() {
+        clearTimeout(timeout);
+        if (script.parentNode) script.parentNode.removeChild(script);
+        try { delete window[callbackName]; } catch (_) { window[callbackName] = undefined; }
+      }
+
+      window[callbackName] = (response) => {
+        cleanup();
+        if (response && response.status === 'error') {
+          reject(new Error(response.message || 'API error'));
+          return;
+        }
+        resolve(response);
+      };
+
+      script.onerror = () => {
+        cleanup();
+        reject(new Error('無法連線到 Apps Script API'));
+      };
+
+      script.src = `${API_URL}?${query.toString()}`;
+      document.body.appendChild(script);
+    });
+  }
+
+  function showError(error) {
+    console.error(error);
+    alert(error?.message || '發生錯誤，請稍後再試');
+  }
+
+  window.onload = () => {
+    document.getElementById('bmiPop1').innerHTML = bmiInfo;
+    document.getElementById('bmiPop2').innerHTML = bmiInfo;
+    if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
+    document.getElementById('inputDate').valueAsDate = new Date();
+    refreshData();
+  };
+
+  // 💎 升級版動態 HUD 控制
+  function triggerHUD(state) {
+    const hud = document.getElementById('hud-overlay');
+    const icon = document.getElementById('hud-icon');
+    const text = document.getElementById('hud-text');
+
+    if (state === 'saving') {
+      hud.style.display = 'flex';
+      void hud.offsetWidth; // 強制重繪以觸發動畫
+      hud.classList.add('show');
+      icon.innerText = '↻';
+      icon.classList.add('hud-spinning');
+      text.innerText = '儲存中...';
+    } else if (state === 'done') {
+      icon.classList.remove('hud-spinning');
+      icon.innerText = '✅';
+      text.innerText = '完成';
+      setTimeout(() => { 
+        hud.classList.remove('show'); 
+        setTimeout(() => { hud.style.display = 'none'; }, 300); // 等待淡出動畫結束
+      }, 1000);
+    }
+  }
+
+  async function refreshData() {
+    const btn = document.getElementById('refreshBtn');
+    if (btn) btn.classList.add('spinning');
+
+    try {
+      const data = await apiCall('getAppData');
+      appData = data;
+      applySettings(data.settings);
+      renderDashboard(data);
+      renderChart(data.history);
+      renderHistoryList(data.history);
+      loadDateData();
+    } catch (error) {
+      showError(error);
+    } finally {
+      if (btn) btn.classList.remove('spinning');
+    }
+  }
+
+  function applySettings(s) {
+    document.getElementById('userNameDisp').innerText = s.userName || '使用者';
+    document.getElementById('dashH').innerText = s.userHeight || '--';
+    document.getElementById('setName').value = s.userName || '';
+    document.getElementById('setHeight').value = s.userHeight || '';
+
+    s.habitNames.forEach((n, i) => {
+      const el = document.getElementById('hName'+i);
+      if(el) el.value = n || '';
+    });
+
+    // 還原原本漂亮的打卡清單 CSS 結構
+    document.getElementById('habitContainer').innerHTML = s.habitNames.map((n, i) => {
+      if(!n) return '';
+      return `
+        <label class="habit-item">
+          <input type="checkbox" id="hc${i}" onchange="autoSaveHabit()">
+          <div class="checkmark"></div>
+          <span class="habit-text">${n}</span>
+        </label>`;
+    }).join('');
+  }
+
+  function renderDashboard(d) {
+    const w = d.latestWeight, h = d.settings.userHeight;
+    document.getElementById('dashW').innerText = w || '--';
+
+    const statusEl = document.getElementById('dashStatus');
+    if (w && h) {
+      const bmi = (w / ((h/100)**2)).toFixed(1);
+      document.getElementById('dashBMI').innerText = bmi;
+
+      if(bmi<18.5){ statusEl.innerText='體重過輕'; statusEl.style.color='#FF9500'; statusEl.style.background='rgba(255,149,0,0.15)'; }
+      else if(bmi<24){ statusEl.innerText='健康體重'; statusEl.style.color='#34C759'; statusEl.style.background='rgba(52,199,89,0.15)'; }
+      else if(bmi<27){ statusEl.innerText='體重過重'; statusEl.style.color='#FF3B30'; statusEl.style.background='rgba(255,59,48,0.15)'; }
+      else if(bmi<30){ statusEl.innerText='輕度肥胖'; statusEl.style.color='#FF3B30'; statusEl.style.background='rgba(255,59,48,0.15)'; }
+      else if(bmi<35){ statusEl.innerText='中度肥胖'; statusEl.style.color='#D00000'; statusEl.style.background='rgba(208,0,0,0.15)'; }
+      else { statusEl.innerText='重度肥胖'; statusEl.style.color='#900000'; statusEl.style.background='rgba(144,0,0,0.15)'; }
+    } else {
+      document.getElementById('dashBMI').innerText = '--';
+      statusEl.innerText = '未設定';
+      statusEl.style.background = 'var(--input-bg)';
+      statusEl.style.color = 'var(--text-sec)';
+    }
+  }
+
+  function autoSaveHabit() {
+    if(!document.getElementById('inputWeight').value) {
+      alert("請先輸入體重，再進行打卡！");
+      refreshData(); // 恢復打勾狀態
+      return;
+    }
+    clearTimeout(autoSaveTimer);
+    autoSaveTimer = setTimeout(() => saveRecord(false), 1000);
+  }
+
+  async function saveRecord(isManual) {
+    const weight = document.getElementById('inputWeight').value;
+    if (isManual && !weight) { alert("請輸入體重！"); return; }
+
+    triggerHUD('saving');
+    const payload = {
+      date: document.getElementById('inputDate').value,
+      weight: weight,
+      note: document.getElementById('inputNote').value,
+      habits: Array.from({ length: 5 }, (_, i) => {
+        const el = document.getElementById('hc' + i);
+        return el ? el.checked : false;
+      })
+    };
+
+    try {
+      await apiCall('saveRecord', { payload });
+      triggerHUD('done');
+      await refreshData();
+    } catch (error) {
+      showError(error);
+      document.getElementById('hud-overlay').classList.remove('show');
+      document.getElementById('hud-overlay').style.display = 'none';
+    }
+  }
+
+  async function updateSettings() {
+    triggerHUD('saving');
+    const payload = {
+      userName: document.getElementById('setName').value,
+      userHeight: document.getElementById('setHeight').value,
+      habitNames: Array.from({ length: 5 }, (_, i) => document.getElementById('hName' + i).value)
+    };
+
+    try {
+      await apiCall('saveSettingsToSheet', { payload });
+      triggerHUD('done');
+      await refreshData();
+    } catch (error) {
+      showError(error);
+      document.getElementById('hud-overlay').classList.remove('show');
+      document.getElementById('hud-overlay').style.display = 'none';
+    }
+  }
+
+  function loadDateData() {
+    if (!appData) return;
+    const iso = document.getElementById('inputDate').value;
+    const today = new Date().toISOString().split('T')[0];
+    const titleEl = document.getElementById('homeTitle');
+
+    if (iso === today) {
+      titleEl.innerText = "今日總覽";
+      titleEl.style.color = "var(--text-main)";
+    } else {
+      titleEl.innerText = iso.replace(/-/g, '/') + " 紀錄";
+      titleEl.style.color = "var(--accent)";
+    }
+
+    const rec = appData.history.find(r => r.isoDate === iso);
+    document.getElementById('inputWeight').value = rec ? rec.weight : "";
+    document.getElementById('inputNote').value = rec ? rec.note : "";
+    for(let i=0; i<5; i++) { 
+      const el = document.getElementById('hc'+i); 
+      if(el) el.checked = rec ? rec.habits[i] : false; 
+    }
+  }
+
+  function clickHomeTab(el) { 
+    document.getElementById('inputDate').valueAsDate = new Date(); 
+    switchView('home', el); 
+    loadDateData(); 
+  }
+
+  function switchView(id, el) {
+    document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active-view'));
+    document.getElementById('view-' + id).classList.add('active-view');
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    if(el) el.classList.add('active');
+    window.scrollTo(0,0);
+  }
+
+  function toggleTheme() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+    if(appData) renderChart(appData.history);
+  }
+
+  function renderChart(history) {
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    const isDark = document.body.classList.contains('dark-mode');
+    const valid = history.filter(d => d.weight > 0).slice(-14);
+    if (chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(ctx, {
+      type: 'line', 
+      data: { 
+        labels: valid.map(d => d.shortDate), 
+        datasets: [{ 
+          data: valid.map(d => d.weight), 
+          borderColor: '#007AFF', borderWidth: 3, tension: 0.4, 
+          pointBackgroundColor: '#FFF', pointBorderColor: '#007AFF', pointBorderWidth: 2, pointRadius: 4, fill: false 
+        }] 
+      },
+      options: { 
+        responsive: true, maintainAspectRatio: false, 
+        plugins: { legend: { display: false } }, 
+        scales: { 
+          x: { grid: { display: false }, ticks: { color: isDark ? '#8E8E93' : '#8E8E93', maxTicksLimit: 7 } }, 
+          y: { grid: { color: isDark ? '#38383A' : '#E5E5EA' } } 
+        } 
+      }
+    });
+  }
+
+  function renderHistoryList(history) {
+    const list = document.getElementById('historyList');
+    if(history.length === 0) {
+      list.innerHTML = "<div style='text-align:center; padding:20px; color:var(--text-sec);'>尚無紀錄</div>";
+      return;
+    }
+
+    list.innerHTML = [...history].reverse().map(item => {
+      const checkedHabits = item.habits.map((val, idx) => val ? appData.settings.habitNames[idx] : null).filter(Boolean);
+      const habitsHtml = checkedHabits.length > 0 ? `<div style="font-size:13px; color:var(--accent); margin-top:8px; font-weight:500;">✓ ${checkedHabits.join('、')}</div>` : '';
+
+      return `
+      <div class="card" style="margin-bottom: 12px; padding: 20px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="font-weight: 600; font-size: 14px; color: var(--text-sec);">${item.date}</div>
+            <div style="color: var(--text-main); font-weight: 700; font-size: 22px; margin-top: 4px;">${item.weight ? item.weight + ' <span style="font-size:14px; color:var(--text-sec);">kg</span>' : '--'}</div>
+            ${item.note ? `<div style="color: var(--text-main); font-size: 15px; margin-top: 6px;">📝 ${item.note}</div>` : ''}
+            ${habitsHtml}
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-small" onclick="editItem('${item.isoDate}')">修改</button>
+            <button class="btn-small btn-del" onclick="deleteRecord(${item.rowId})">刪除</button>
+          </div>
+        </div>
+      </div>`
+    }).join('');
+  }
+
+  function editItem(iso) { 
+    document.getElementById('inputDate').value = iso; 
+    switchView('home', document.querySelectorAll('.tab-item')[0]); 
+    loadDateData(); 
+  }
+
+  async function deleteRecord(id) { 
+    if (confirm('確定要刪除這筆紀錄嗎？')) {
+      triggerHUD('saving');
+      try {
+        await apiCall('deleteRecord', { rowId: id });
+        triggerHUD('done');
+        await refreshData();
+      } catch (error) {
+        showError(error);
+        document.getElementById('hud-overlay').classList.remove('show');
+        document.getElementById('hud-overlay').style.display = 'none';
+      }
+    }
+  }
+</script>
+</body>
+</html>
