@@ -77,14 +77,19 @@
     .dash-val { font-size: 18px; font-weight: 700; }
     .status-badge { font-size: 11px; font-weight: 700; padding: 4px 6px; border-radius: 8px; margin: 0 auto; white-space: nowrap;}
 
-    /* 懸浮提示 */
+    /* 💎 修正版 懸浮提示 (Tooltip) */
     .tooltip-box {
-      visibility: hidden; width: 220px; background-color: rgba(28,28,30,0.95); color: #FFF;
-      text-align: left; border-radius: 12px; padding: 12px; position: absolute; z-index: 100;
-      top: 105%; left: 50%; transform: translateX(-50%); box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+      visibility: hidden; width: 220px; background-color: rgba(28,28,30,0.96); color: #FFF;
+      text-align: left; border-radius: 12px; padding: 12px; position: absolute; z-index: 999;
+      top: 110%; left: 50%; transform: translateX(-50%); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
       opacity: 0; transition: 0.2s; font-size: 12px; pointer-events: none;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     }
-    .dash-box:hover .tooltip-box, .dash-box:active .tooltip-box { visibility: visible; opacity: 1; }
+    /* 支援電腦懸浮與手機點擊 */
+    .dash-box:hover .tooltip-box, 
+    .dash-box:active .tooltip-box,
+    .dash-box.show-tooltip .tooltip-box { visibility: visible; opacity: 1; }
+
     .t-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
     .t-row:last-child { border-bottom: none; padding-bottom: 0;}
 
@@ -123,7 +128,7 @@
 
     /* 按鈕與底欄 */
     .btn-small { background: var(--input-bg); color: var(--accent); border: none; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
-    .btn-del { color: #FF3B30; background: rgba(255, 59, 48, 0.1); }
+    .btn-small.btn-del { color: #FF3B30; background: rgba(255, 59, 48, 0.1); }
     
     .tab-bar { 
       position: fixed; bottom: 0; left: 0; right: 0; height: 80px; 
@@ -276,17 +281,28 @@
     if (localStorage.getItem('theme') === 'dark') document.body.classList.add('dark-mode');
     document.getElementById('inputDate').valueAsDate = new Date();
     refreshData();
+    
+    // 💎 手機點擊觸發 Tooltip 邏輯
+    const dashBoxes = document.querySelectorAll('.dash-box');
+    dashBoxes.forEach(box => {
+      box.addEventListener('click', (e) => {
+        const isShowing = box.classList.contains('show-tooltip');
+        dashBoxes.forEach(b => b.classList.remove('show-tooltip'));
+        if (!isShowing) box.classList.add('show-tooltip');
+        e.stopPropagation();
+      });
+    });
+    document.addEventListener('click', () => {
+      dashBoxes.forEach(box => box.classList.remove('show-tooltip'));
+    });
   };
 
-  // 💎 核心 API 呼叫函數
   async function callAPI(action, payload = null) {
     try {
       if (!payload) {
-        // GET 請求
         const res = await fetch(`${API_URL}?action=${action}`);
         return await res.json();
       } else {
-        // POST 請求
         const res = await fetch(API_URL, {
           method: 'POST',
           body: JSON.stringify({ action, payload })
@@ -340,7 +356,7 @@
   }
 
   function applySettings(s) {
-    document.getElementById('userNameDisp').innerText = s.userName || '使用者';
+    document.getElementById('userNameDisp').innerText = s.userName || 'Dylan';
     document.getElementById('dashH').innerText = s.userHeight || '--';
     document.getElementById('setName').value = s.userName || '';
     document.getElementById('setHeight').value = s.userHeight || '';
