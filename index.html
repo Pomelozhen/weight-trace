@@ -77,15 +77,39 @@
     .dash-val { font-size: 18px; font-weight: 700; }
     .status-badge { font-size: 11px; font-weight: 700; padding: 4px 6px; border-radius: 8px; margin: 0 auto; white-space: nowrap;}
 
-    /* 💎 修正版 懸浮提示 (Tooltip) */
+    /* 💎 修正版 懸浮提示 (Tooltip) - 解決溢出問題 */
     .tooltip-box {
-      visibility: hidden; width: 220px; background-color: rgba(28,28,30,0.96); color: #FFF;
-      text-align: left; border-radius: 12px; padding: 12px; position: absolute; z-index: 999;
-      top: 110%; left: 50%; transform: translateX(-50%); box-shadow: 0 8px 24px rgba(0,0,0,0.3);
-      opacity: 0; transition: 0.2s; font-size: 12px; pointer-events: none;
-      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+      visibility: hidden; 
+      width: 200px; /* 稍微縮小寬度更適合手機 */
+      max-width: 80vw; 
+      background-color: rgba(28,28,30,0.96); 
+      color: #FFF;
+      text-align: left; 
+      border-radius: 12px; 
+      padding: 12px; 
+      position: absolute; 
+      z-index: 999;
+      top: 115%; /* 往下移一點，不要擋住數字 */
+      left: 50%;
+      transform: translateX(-50%);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+      opacity: 0; 
+      transition: 0.2s; 
+      font-size: 12px; 
+      pointer-events: none;
+      backdrop-filter: blur(10px); 
+      -webkit-backdrop-filter: blur(10px);
     }
-    /* 支援電腦懸浮與手機點擊 */
+
+    /* 💎 智慧對齊：根據方塊位置調整提示框方向 */
+    /* 第 1 個方塊：靠左對齊 */
+    .dash-box:nth-child(1) .tooltip-box { left: 0; transform: translateX(0); }
+    /* 第 2, 3 個方塊：保持置中 (稍微偏向內部) */
+    .dash-box:nth-child(2) .tooltip-box { left: -20%; transform: translateX(0); }
+    .dash-box:nth-child(3) .tooltip-box { left: auto; right: -20%; transform: translateX(0); }
+    /* 第 4 個方塊：靠右對齊 */
+    .dash-box:nth-child(4) .tooltip-box { left: auto; right: 0; transform: translateX(0); }
+
     .dash-box:hover .tooltip-box, 
     .dash-box:active .tooltip-box,
     .dash-box.show-tooltip .tooltip-box { visibility: visible; opacity: 1; }
